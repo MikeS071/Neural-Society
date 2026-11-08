@@ -112,7 +112,9 @@ Each run writes `results/<model>.json`, with every run and full transcripts, and
 `llama-server`, LM Studio or vLLM. No API key is needed.
 
 ```bash
-# Ollama
+# Ollama. Raise the context window first: multi-turn runs reach ~10-15K tokens, and
+# Ollama silently truncates prompts beyond its default context length.
+OLLAMA_CONTEXT_LENGTH=16384 ollama serve        # in another terminal
 ollama pull qwen2.5-coder:7b
 python3 run_bench.py --planner local --model qwen2.5-coder:7b --workers 1
 
