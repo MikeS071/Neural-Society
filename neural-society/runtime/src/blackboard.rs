@@ -53,7 +53,11 @@ pub struct Blackboard {
 
 impl Blackboard {
     pub fn with_capacity(digits: usize, slots: usize) -> Self {
-        Blackboard { digits: Vec::with_capacity(digits), slots: Vec::with_capacity(slots), low_conf: Vec::with_capacity(64) }
+        Blackboard {
+            digits: Vec::with_capacity(digits),
+            slots: Vec::with_capacity(slots),
+            low_conf: Vec::with_capacity(64),
+        }
     }
 
     pub fn reset(&mut self) {
@@ -64,14 +68,24 @@ impl Blackboard {
 
     pub fn alloc(&mut self, kind: Kind) -> SlotId {
         let id = self.slots.len() as SlotId;
-        self.slots.push(Slot { kind, status: Status::Pending, neg: false, start: self.digits.len() as u32, len: 0 });
+        self.slots.push(Slot {
+            kind,
+            status: Status::Pending,
+            neg: false,
+            start: self.digits.len() as u32,
+            len: 0,
+        });
         id
     }
 
     #[inline]
     pub fn push(&mut self, id: SlotId, d: u8) {
         debug_assert!(d < 10);
-        debug_assert_eq!(id as usize, self.slots.len() - 1, "only the newest slot is writable");
+        debug_assert_eq!(
+            id as usize,
+            self.slots.len() - 1,
+            "only the newest slot is writable"
+        );
         self.digits.push(d);
         self.slots[id as usize].len += 1;
     }

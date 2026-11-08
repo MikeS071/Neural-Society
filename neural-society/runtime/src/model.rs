@@ -30,7 +30,10 @@ pub struct Scratch {
 impl Scratch {
     pub fn for_model(m: &Mlp) -> Self {
         let w = m.layers.iter().map(|l| l.out.max(l.inp)).max().unwrap_or(0);
-        Scratch { a: vec![0.0; w], b: vec![0.0; w] }
+        Scratch {
+            a: vec![0.0; w],
+            b: vec![0.0; w],
+        }
     }
 }
 
@@ -71,7 +74,9 @@ impl Mlp {
                 }
             }
             let floats = |s: &[u8]| -> Vec<f32> {
-                s.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect()
+                s.chunks_exact(4)
+                    .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                    .collect()
             };
             let w = floats(take(4 * inp * out)?);
             let b = floats(take(4 * out)?);
@@ -133,9 +138,9 @@ impl Mlp {
         let last = self.layers.len() - 1;
         for (k, l) in self.layers.iter().enumerate().skip(first) {
             let (x, y) = (&s.a[..l.inp], &mut s.b[..l.out]);
-            for o in 0..l.out {
-                let v = l.b[o] + dot(&l.w[o * l.inp..(o + 1) * l.inp], x);
-                y[o] = if k < last { v.max(0.0) } else { v };
+            for ((yo, row), &bo) in y.iter_mut().zip(l.w.chunks_exact(l.inp)).zip(&l.b) {
+                let v = bo + dot(row, x);
+                *yo = if k < last { v.max(0.0) } else { v };
             }
             std::mem::swap(&mut s.a, &mut s.b);
         }

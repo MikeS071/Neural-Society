@@ -17,7 +17,10 @@ impl Baseline {
     pub fn load(path: impl AsRef<Path>) -> io::Result<Self> {
         let mlp = Mlp::load(path)?;
         if mlp.in_dim() != 63 || mlp.out_dim() != 62 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "not a baseline model (expects 63 -> 62)"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "not a baseline model (expects 63 -> 62)",
+            ));
         }
         let scratch = Scratch::for_model(&mlp);
         Ok(Baseline { mlp, scratch })
@@ -33,7 +36,8 @@ impl Baseline {
         let (a, rest) = expr.split_at(pos);
         let op = "+-*".find(&rest[..1])?;
         let b = &rest[1..];
-        let ok = |s: &str| !s.is_empty() && s.len() <= N_DIG && s.bytes().all(|c| c.is_ascii_digit());
+        let ok =
+            |s: &str| !s.is_empty() && s.len() <= N_DIG && s.bytes().all(|c| c.is_ascii_digit());
         if !ok(a) || !ok(b) {
             return None;
         }
@@ -41,7 +45,9 @@ impl Baseline {
     }
 
     pub fn predict(&mut self, expr: &str, out: &mut String) -> bool {
-        let Some((a, op, b)) = Self::accepts(expr) else { return false };
+        let Some((a, op, b)) = Self::accepts(expr) else {
+            return false;
+        };
         let mut active = [0usize; 2 * N_DIG + 1];
         for i in 0..N_DIG {
             let p = 10u32.pow((N_DIG - 1 - i) as u32);

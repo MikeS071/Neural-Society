@@ -106,7 +106,11 @@ impl Learned {
                 io::ErrorKind::InvalidData,
                 format!(
                     "{label}: model is {}->{} but {} needs {}->{}",
-                    mlp.in_dim(), mlp.out_dim(), op.name(), in_dim, op.classes()
+                    mlp.in_dim(),
+                    mlp.out_dim(),
+                    op.name(),
+                    in_dim,
+                    op.classes()
                 ),
             ));
         }
@@ -115,7 +119,13 @@ impl Learned {
             offsets[j] = offsets[j - 1] + f[j - 1];
         }
         let scratch = Scratch::for_model(&mlp);
-        Ok(Learned { op, mlp, scratch, offsets, label: label.to_string() })
+        Ok(Learned {
+            op,
+            mlp,
+            scratch,
+            offsets,
+            label: label.to_string(),
+        })
     }
 
     pub fn load(op: Op, path: impl AsRef<Path>, label: &str) -> io::Result<Self> {
@@ -139,10 +149,16 @@ impl Specialist for Learned {
         let f = self.op.fields();
         let mut active = [0usize; 3];
         for j in 0..f.len() {
-            debug_assert!((args[j] as usize) < f[j], "{} arg {j} out of range", self.op.name());
+            debug_assert!(
+                (args[j] as usize) < f[j],
+                "{} arg {j} out of range",
+                self.op.name()
+            );
             active[j] = self.offsets[j] + args[j] as usize;
         }
-        let logits = self.mlp.forward_onehot(&active[..f.len()], &mut self.scratch);
+        let logits = self
+            .mlp
+            .forward_onehot(&active[..f.len()], &mut self.scratch);
         let (k, conf) = argmax_conf(logits);
         (k as u16, conf)
     }
@@ -158,7 +174,9 @@ pub fn build_society(cfg: &str, weights: &Path) -> io::Result<Vec<Box<dyn Specia
     let base = parts.next().unwrap_or("learned");
     let mut kinds = [base; 4];
     for p in parts {
-        let (op, kind) = p.split_once('=').ok_or_else(|| inval(format!("bad override '{p}'")))?;
+        let (op, kind) = p
+            .split_once('=')
+            .ok_or_else(|| inval(format!("bad override '{p}'")))?;
         let op = Op::ALL
             .into_iter()
             .find(|o| o.name() == op)
@@ -170,8 +188,16 @@ pub fn build_society(cfg: &str, weights: &Path) -> io::Result<Vec<Box<dyn Specia
         .map(|op| -> io::Result<Box<dyn Specialist>> {
             match kinds[op as usize] {
                 "exact" => Ok(Box::new(Exact(op))),
-                "learned" => Ok(Box::new(Learned::load(op, weights.join(format!("{}.bin", op.name())), op.name())?)),
-                "weak" if op == Op::Mul => Ok(Box::new(Learned::load(op, weights.join("mul_weak.bin"), "mul_weak")?)),
+                "learned" => Ok(Box::new(Learned::load(
+                    op,
+                    weights.join(format!("{}.bin", op.name())),
+                    op.name(),
+                )?)),
+                "weak" if op == Op::Mul => Ok(Box::new(Learned::load(
+                    op,
+                    weights.join("mul_weak.bin"),
+                    "mul_weak",
+                )?)),
                 k => Err(inval(format!("unknown kind '{k}' for {}", op.name()))),
             }
         })

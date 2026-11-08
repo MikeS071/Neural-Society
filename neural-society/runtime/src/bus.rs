@@ -55,7 +55,12 @@ impl Backend for Direct {
 
 fn assert_specs(specs: &[Box<dyn Specialist>]) {
     for (i, s) in specs.iter().enumerate() {
-        assert_eq!(s.op() as usize, i, "specialist {i} is {:?}; expected one per op in Op order", s.op());
+        assert_eq!(
+            s.op() as usize,
+            i,
+            "specialist {i} is {:?}; expected one per op in Op order",
+            s.op()
+        );
     }
 }
 
@@ -97,7 +102,8 @@ impl Bus {
     /// `spin`: busy-poll before blocking (see [`recv`]), in specialists and clients.
     pub fn spawn(specs: Vec<Box<dyn Specialist>>, n_clients: usize, spin: bool) -> Bus {
         assert_specs(&specs);
-        let (reply_tx, replies): (Vec<_>, Vec<_>) = (0..n_clients).map(|_| channel::<Message>()).unzip();
+        let (reply_tx, replies): (Vec<_>, Vec<_>) =
+            (0..n_clients).map(|_| channel::<Message>()).unzip();
         let mut inboxes = Vec::new();
         let mut threads = Vec::new();
         for mut spec in specs {
@@ -124,7 +130,12 @@ impl Bus {
                     .expect("spawn specialist thread"),
             );
         }
-        Bus { inboxes, replies: replies.into_iter().map(Some).collect(), threads, spin }
+        Bus {
+            inboxes,
+            replies: replies.into_iter().map(Some).collect(),
+            threads,
+            spin,
+        }
     }
 
     /// Take the handle for client `i` (each can be taken once, and moved to its own thread).
@@ -142,7 +153,10 @@ impl Bus {
     /// All `BusClient`s must be dropped first, or this blocks.
     pub fn shutdown(self) -> Vec<u64> {
         drop(self.inboxes);
-        self.threads.into_iter().map(|t| t.join().expect("specialist panicked")).collect()
+        self.threads
+            .into_iter()
+            .map(|t| t.join().expect("specialist panicked"))
+            .collect()
     }
 }
 
@@ -158,8 +172,18 @@ impl Backend for BusClient {
     fn call(&mut self, op: Op, args: [u8; 4]) -> (u16, f32) {
         let id = self.next_id;
         self.next_id = self.next_id.wrapping_add(1);
-        let m = Message { id, from: self.id, to: op as u16, op: op as u8, args, result: 0, conf: 0.0 };
-        self.inboxes[m.to as usize].send(m).expect("specialist thread died");
+        let m = Message {
+            id,
+            from: self.id,
+            to: op as u16,
+            op: op as u8,
+            args,
+            result: 0,
+            conf: 0.0,
+        };
+        self.inboxes[m.to as usize]
+            .send(m)
+            .expect("specialist thread died");
         let r = recv(&self.rx, self.spin).expect("specialist thread died");
         debug_assert_eq!(r.id, id);
         (r.result, r.conf)
@@ -175,7 +199,10 @@ mod tests {
     use crate::specialists::Exact;
 
     fn exact() -> Vec<Box<dyn Specialist>> {
-        Op::ALL.into_iter().map(|o| Box::new(Exact(o)) as Box<dyn Specialist>).collect()
+        Op::ALL
+            .into_iter()
+            .map(|o| Box::new(Exact(o)) as Box<dyn Specialist>)
+            .collect()
     }
 
     #[test]

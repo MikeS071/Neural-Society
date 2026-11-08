@@ -162,7 +162,14 @@ impl<B: Backend> Router<B> {
                 r = op.exact(args);
                 self.escalations += 1;
             }
-            self.bb.low_conf.push(LowConf { call: self.calls, op, args, result: r, conf, escalated: self.escalate });
+            self.bb.low_conf.push(LowConf {
+                call: self.calls,
+                op,
+                args,
+                result: r,
+                conf,
+                escalated: self.escalate,
+            });
         }
         r
     }
@@ -237,7 +244,10 @@ impl<B: Backend> Router<B> {
         }
         let mut carry = 0u8;
         for i in shift..lx.max(ly) {
-            let s = self.ask(Op::Add, [self.bb.digit(x, i), self.bb.digit(y, i - shift), carry, 0]);
+            let s = self.ask(
+                Op::Add,
+                [self.bb.digit(x, i), self.bb.digit(y, i - shift), carry, 0],
+            );
             self.bb.push(r, (s % 10) as u8);
             carry = (s / 10) as u8;
         }
@@ -252,7 +262,10 @@ impl<B: Backend> Router<B> {
         let r = self.bb.alloc(Kind::StepResult);
         let mut borrow = 0u8;
         for i in 0..self.bb.len(x) {
-            let v = self.ask(Op::Sub, [self.bb.digit(x, i), self.bb.digit(y, i), borrow, 0]);
+            let v = self.ask(
+                Op::Sub,
+                [self.bb.digit(x, i), self.bb.digit(y, i), borrow, 0],
+            );
             if v >= 10 {
                 self.bb.push(r, (v - 10) as u8);
                 borrow = 0;
@@ -267,7 +280,11 @@ impl<B: Backend> Router<B> {
     /// Long multiplication: one row per digit of the shorter operand (`mul` with carry),
     /// accumulated with shifted long addition (`add`). Returns an unfinished slot.
     fn mul_mag(&mut self, a: SlotId, b: SlotId) -> SlotId {
-        let (a, b) = if self.bb.len(a) >= self.bb.len(b) { (a, b) } else { (b, a) };
+        let (a, b) = if self.bb.len(a) >= self.bb.len(b) {
+            (a, b)
+        } else {
+            (b, a)
+        };
         let mut sum: Option<SlotId> = None;
         let rows = self.bb.len(b);
         for j in 0..rows {
@@ -286,7 +303,11 @@ impl<B: Backend> Router<B> {
             sum = Some(match sum {
                 None => row,
                 Some(s) => {
-                    let kind = if j + 1 == rows { Kind::StepResult } else { Kind::Intermediate };
+                    let kind = if j + 1 == rows {
+                        Kind::StepResult
+                    } else {
+                        Kind::Intermediate
+                    };
                     let n = self.add_mag(s, row, j, kind);
                     self.bb.finish(n, false);
                     n
@@ -305,7 +326,12 @@ mod tests {
     use crate::specialists::{Exact, Specialist};
 
     fn router() -> Router<Direct> {
-        Router::new(Direct::new(Op::ALL.into_iter().map(|o| Box::new(Exact(o)) as Box<dyn Specialist>).collect()))
+        Router::new(Direct::new(
+            Op::ALL
+                .into_iter()
+                .map(|o| Box::new(Exact(o)) as Box<dyn Specialist>)
+                .collect(),
+        ))
     }
 
     fn eval(r: &mut Router<Direct>, e: &str) -> String {
@@ -331,8 +357,10 @@ mod tests {
             ("1-2*3*0", "1"),
             ("3-5*2+100", "93"),
             ("2-3-4*5*6+7", "-114"),
-            ("123456789012345678901234567890*987654321098765432109876543210",
-             "121932631137021795226185032733622923332237463801111263526900"),
+            (
+                "123456789012345678901234567890*987654321098765432109876543210",
+                "121932631137021795226185032733622923332237463801111263526900",
+            ),
             ("100000000000000000000-1", "99999999999999999999"),
             ("1-100000000000000000000", "-99999999999999999999"),
             ("00012", "12"),
