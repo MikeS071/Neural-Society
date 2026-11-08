@@ -94,6 +94,49 @@ class AnthropicPlanner:
                 raise
 
 
+class OpenAICompatPlanner:
+    """Any server speaking the OpenAI chat-completions API: Ollama, llama.cpp's llama-server,
+    LM Studio, vLLM. Used for locally hosted (e.g. CPU-only) planners. No API key needed for
+    local servers; NS_LOCAL_API_KEY is sent as a bearer token if set."""
+
+    def __init__(self, model, base_url="http://localhost:11434/v1", max_tokens=2000, temperature=0.0, timeout=1800):
+        self.model = model
+        self.base_url = base_url.rstrip("/")
+        self.max_tokens = max_tokens
+        self.temperature = temperature
+        self.timeout = timeout  # CPU inference on long prompts can take minutes
+        self.api_key = os.environ.get("NS_LOCAL_API_KEY")
+
+    def __call__(self, system, messages):
+        body = json.dumps(
+            {
+                "model": self.model,
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature,
+                "messages": [{"role": "system", "content": system}, *messages],
+            }
+        ).encode()
+        headers = {"content-type": "application/json"}
+        if self.api_key:
+            headers["authorization"] = f"Bearer {self.api_key}"
+        req = urllib.request.Request(f"{self.base_url}/chat/completions", data=body, method="POST", headers=headers)
+        for attempt in range(3):
+            t0 = time.time()
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                    out = json.loads(r.read())
+                text = out["choices"][0]["message"].get("content") or ""
+                u = out.get("usage") or {}
+                return PlannerReply(
+                    text, Usage(1, u.get("prompt_tokens", 0), u.get("completion_tokens", 0), time.time() - t0)
+                )
+            except urllib.error.HTTPError as e:
+                if e.code >= 500 and attempt < 2:
+                    time.sleep(5)
+                    continue
+                raise RuntimeError(f"local model server error {e.code}: {e.read()[:500]!r}") from None
+
+
 class ScriptedPlanner:
     """Offline stand-in: replays a fixed list of replies (or a function of the conversation).
     Token counts are estimated as len(text) / 4 so harness accounting can be tested."""

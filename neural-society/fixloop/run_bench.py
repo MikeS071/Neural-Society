@@ -2,10 +2,12 @@
 
 Usage:
   python3 run_bench.py --model claude-sonnet-5-5 [--arms solo,society] [--repeats 1]
-                       [--max-iters 5] [--tasks id1,id2] [--workers 4] [--planner anthropic|oracle]
+                       [--max-iters 5] [--tasks id1,id2] [--workers 4] [--planner anthropic|local|oracle]
 
-Needs ANTHROPIC_API_KEY for --planner anthropic (the default). `--planner oracle`
-reverts the injected bugs and only checks the harness end to end.
+  --planner anthropic  (default) Claude via the Messages API; needs ANTHROPIC_API_KEY.
+  --planner local      any OpenAI-compatible server (Ollama, llama-server, LM Studio, vLLM), e.g.
+                       --planner local --model qwen2.5-coder:7b --base-url http://localhost:11434/v1 --workers 1
+  --planner oracle     reverts the injected bugs; only checks the harness end to end.
 Writes results/<model>.json (every run, with transcripts) and results/<model>.md.
 """
 
@@ -18,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from ns_fix.agents import solve
 from ns_fix.blackboard import new_pool
-from ns_fix.llm import AnthropicPlanner, oracle_planner
+from ns_fix.llm import AnthropicPlanner, OpenAICompatPlanner, oracle_planner
 from ns_fix.tasks import load_tasks, write_text
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -90,7 +92,12 @@ def main():
     ap.add_argument("--max-iters", type=int, default=5)
     ap.add_argument("--tasks", default="")
     ap.add_argument("--workers", type=int, default=4)
-    ap.add_argument("--planner", default="anthropic", choices=["anthropic", "oracle"])
+    ap.add_argument("--planner", default="anthropic", choices=["anthropic", "local", "oracle"])
+    ap.add_argument(
+        "--base-url",
+        default="http://localhost:11434/v1",
+        help="for --planner local: OpenAI-compatible endpoint (Ollama default; llama-server: http://localhost:8080/v1)",
+    )
     ap.add_argument("--out", default=os.path.join(HERE, "results"))
     args = ap.parse_args()
     arms = args.arms.split(",")
@@ -103,7 +110,12 @@ def main():
 
     def run(job):
         t, a, k = job
-        planner = oracle_planner(t) if args.planner == "oracle" else AnthropicPlanner(args.model)
+        if args.planner == "oracle":
+            planner = oracle_planner(t)
+        elif args.planner == "local":
+            planner = OpenAICompatPlanner(args.model, args.base_url)
+        else:
+            planner = AnthropicPlanner(args.model)
         try:
             r = solve(t, a, planner, max_iters=args.max_iters, pool=spec_pool, keep=True)
         except Exception as e:  # keep the sweep going; record the failure
@@ -123,7 +135,7 @@ def main():
     spec_pool.shutdown()
     errors = [r for r in runs if "error" in r]
     runs = [r for r in runs if "error" not in r]
-    name = args.model if args.planner == "anthropic" else "oracle"
+    name = "oracle" if args.planner == "oracle" else args.model.replace("/", "_").replace(":", "-")
     os.makedirs(args.out, exist_ok=True)
     write_text(
         os.path.join(args.out, f"{name}.json"),

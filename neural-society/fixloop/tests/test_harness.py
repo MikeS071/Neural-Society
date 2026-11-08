@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ns_fix.agents import solve  # noqa: E402
 from ns_fix.blackboard import Blackboard  # noqa: E402
-from ns_fix.llm import ScriptedPlanner, oracle_planner, parse_edits  # noqa: E402
+from ns_fix.llm import OpenAICompatPlanner, ScriptedPlanner, oracle_planner, parse_edits  # noqa: E402
 from ns_fix.mutate import CLASSES  # noqa: E402
 from ns_fix.specialists import (  # noqa: E402
     N_FEATURES,
@@ -117,7 +117,58 @@ class TestSpecialists(unittest.TestCase):
         self.assertEqual(len(features(None, None, None)), N_FEATURES)
 
 
+class FakeOpenAIServer:
+    """Minimal OpenAI-compatible endpoint that answers like the oracle planner."""
+
+    def __init__(self, task):
+        import http.server
+        import threading
+
+        oracle = oracle_planner(task)
+        seen = self.requests = []
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["content-length"])))
+                seen.append(body)
+                text = oracle("", body["messages"][1:]).text
+                out = {
+                    "choices": [{"message": {"role": "assistant", "content": text}}],
+                    "usage": {"prompt_tokens": 123, "completion_tokens": 45},
+                }
+                data = json.dumps(out).encode()
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *a):
+                pass
+
+        self.server = http.server.HTTPServer(("127.0.0.1", 0), H)
+        self.url = f"http://127.0.0.1:{self.server.server_port}/v1"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
 class TestLoop(unittest.TestCase):
+    def test_local_openai_compatible_planner(self):
+        t = TASKS["roman-repeat"]
+        srv = FakeOpenAIServer(t)
+        try:
+            r = solve(t, "society", OpenAICompatPlanner("local-model", srv.url))
+        finally:
+            srv.close()
+        self.assertTrue(r["success"])
+        self.assertEqual((r["input_tokens"], r["output_tokens"]), (123, 45))
+        req = srv.requests[0]
+        self.assertEqual(req["model"], "local-model")
+        self.assertEqual(req["messages"][0]["role"], "system")
+
     def test_oracle_solves_in_one_call(self):
         for tid in ("bsearch-hang", "graph-visited", "ledger-helper-pad", "inventory-latent-delete"):
             for arm in ("solo", "society"):

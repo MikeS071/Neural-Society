@@ -5,8 +5,8 @@ structured findings through a blackboard, compared with the same model working f
 raw tool output?
 
 **Status:** the harness, task suite, specialists and both arms are built and tested
-offline. No real model runs have been done yet; they need an `ANTHROPIC_API_KEY` (see
-[Running](#running)). Nothing in this folder reports model results until those runs
+offline. No real model runs have been done yet. They need either an
+`ANTHROPIC_API_KEY` or a locally hosted model (see [Running](#running)). Nothing in this folder reports model results until those runs
 exist.
 
 ## The experiment
@@ -105,6 +105,27 @@ python3 run_bench.py --model claude-haiku-5-5 --repeats 3
 
 Each run writes `results/<model>.json`, with every run and full transcripts, and
 `results/<model>.md`, with summary and per-task tables.
+
+### Local, CPU-only planner
+
+`--planner local` drives any OpenAI-compatible server: Ollama, llama.cpp's
+`llama-server`, LM Studio or vLLM. No API key is needed.
+
+```bash
+# Ollama
+ollama pull qwen2.5-coder:7b
+python3 run_bench.py --planner local --model qwen2.5-coder:7b --workers 1
+
+# llama.cpp
+llama-server -m qwen2.5-coder-7b-instruct-q4_k_m.gguf -c 16384 --port 8080
+python3 run_bench.py --planner local --model local --base-url http://localhost:8080/v1 --workers 1
+```
+
+On CPU, use `--workers 1`, because generation is compute-bound and parallel requests
+only queue. Allow on the order of 1–3 minutes per planner call for a 4-bit 7B model on
+4 cores (an estimate, not yet measured here). A full pass of 62 runs could therefore
+take several hours; 1.5B–3B models are several times faster. Small local models are
+where structured specialist help is most likely to change the outcome.
 
 There are no dependencies beyond the Python standard library. ruff is optional: without
 it the linter reports itself unavailable. NumPy is needed only to retrain the
