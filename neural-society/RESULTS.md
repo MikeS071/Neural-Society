@@ -182,7 +182,7 @@ What the numbers say:
    needed a confidence threshold calibrated on the full input space, which real-world
    specialists will not have.
 
-## Next milestone (not started)
+## Next milestone (harness built; see [`fixloop/`](fixloop/README.md))
 
 The next milestone is the "fix the failing test" loop: a large model as planner,
 with fast specialists (compiler, test runner, linter, failure classifier) writing

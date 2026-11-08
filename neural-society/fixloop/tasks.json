@@ -1,0 +1,80 @@
+{
+  "_doc": "Each task applies one or more bugs (exact old->new replacements) to a reference program in programs/<program>/src. Category labels are what the failure classifier is scored against. 'latent' bugs are only caught by hidden tests.",
+  "tasks": [
+    {"id": "stats-median-even", "program": "stats", "bugs": [
+      {"file": "src/stats.py", "old": "    mid = n // 2\n", "new": "    mid = (n - 1) // 2\n", "category": "off_by_one"}]},
+    {"id": "stats-mode-tie", "program": "stats", "bugs": [
+      {"file": "src/stats.py", "old": "return min(x for x, c in counts.items() if c == best)", "new": "return max(x for x, c in counts.items() if c == best)", "category": "wrong_name"}]},
+    {"id": "stats-two-bugs", "program": "stats", "bugs": [
+      {"file": "src/stats.py", "old": "return sum((x - m) ** 2 for x in xs) / len(xs)", "new": "return sum((x - m) ** 2 for x in xs) / (len(xs) - 1)", "category": "off_by_one"},
+      {"file": "src/stats.py", "old": "    return s[rank - 1]\n", "new": "    return s[rank]\n", "category": "off_by_one"}]},
+
+    {"id": "textutil-title-first", "program": "textutil", "bugs": [
+      {"file": "src/textutil.py", "old": "if i > 0 and lw in small_words:", "new": "if lw in small_words:", "category": "condition"}]},
+    {"id": "textutil-palindrome-name", "program": "textutil", "bugs": [
+      {"file": "src/textutil.py", "old": "return chars == chars[::-1]", "new": "return chars == char[::-1]", "category": "wrong_name"}]},
+    {"id": "textutil-truncate", "program": "textutil", "bugs": [
+      {"file": "src/textutil.py", "old": "return text[: limit - len(suffix)] + suffix", "new": "return text[: limit - len(suffix) + 1] + suffix", "category": "off_by_one"}]},
+
+    {"id": "intervals-length", "program": "intervals", "bugs": [
+      {"file": "src/intervals.py", "old": "sum(end - start + 1 for", "new": "sum(end - start for", "category": "off_by_one"}]},
+    {"id": "intervals-overlap-touch", "program": "intervals", "bugs": [
+      {"file": "src/intervals.py", "old": "return a[0] <= b[1] and b[0] <= a[1]", "new": "return a[0] <= b[1] and b[0] < a[1]", "category": "condition"}]},
+    {"id": "intervals-contained", "program": "intervals", "bugs": [
+      {"file": "src/intervals.py", "old": "merged[-1] = (merged[-1][0], max(merged[-1][1], end))", "new": "merged[-1] = (merged[-1][0], end)", "category": "missing_logic"}]},
+
+    {"id": "roman-table", "program": "roman", "bugs": [
+      {"file": "src/roman.py", "old": "(90, \"XC\")", "new": "(90, \"LC\")", "category": "constant"}]},
+    {"id": "roman-subtractive", "program": "roman", "bugs": [
+      {"file": "src/roman.py", "old": "if i + 1 < len(s) and _SYMBOL[s[i + 1]] > v:", "new": "if i + 1 < len(s) and _SYMBOL[s[i + 1]] >= v:", "category": "condition"}]},
+    {"id": "roman-repeat", "program": "roman", "bugs": [
+      {"file": "src/roman.py", "old": "        while n >= value:\n", "new": "        if n >= value:\n", "category": "missing_logic"}]},
+
+    {"id": "inventory-add-existing", "program": "inventory", "bugs": [
+      {"file": "src/inventory.py", "old": "self._items[name][0] += quantity", "new": "self._items[name][0] = quantity", "category": "arithmetic"}]},
+    {"id": "inventory-total-items", "program": "inventory", "bugs": [
+      {"file": "src/inventory.py", "old": "for q, p in self._items.values())", "new": "for q, p in self._items.items())", "category": "wrong_name"}]},
+    {"id": "inventory-latent-delete", "program": "inventory", "latent": true, "bugs": [
+      {"file": "src/inventory.py", "old": "if q < threshold)", "new": "if q > threshold)", "category": "condition"},
+      {"file": "src/inventory.py", "old": "if self._items[name][0] == 0:", "new": "if self._items[name][0] < 0:", "category": "condition"}]},
+
+    {"id": "bsearch-hang", "program": "bsearch", "bugs": [
+      {"file": "src/bsearch.py", "old": "            lo = mid + 1\n", "new": "            lo = mid\n", "category": "off_by_one"}]},
+    {"id": "bsearch-upper", "program": "bsearch", "bugs": [
+      {"file": "src/bsearch.py", "old": "if xs[mid] < target:", "new": "if xs[mid] <= target:", "category": "condition"}]},
+    {"id": "bsearch-count", "program": "bsearch", "bugs": [
+      {"file": "src/bsearch.py", "old": "return lower_bound(xs, hi + 1) - lower_bound(xs, lo)", "new": "return lower_bound(xs, hi) - lower_bound(xs, lo)", "category": "off_by_one"}]},
+
+    {"id": "matrix-transpose-index", "program": "matrix", "bugs": [
+      {"file": "src/matrix.py", "old": "return [[m[r][c] for r in range(rows)] for c in range(cols)]", "new": "return [[m[c][r] for r in range(rows)] for c in range(cols)]", "category": "wrong_name"}]},
+    {"id": "matrix-det-sign", "program": "matrix", "bugs": [
+      {"file": "src/matrix.py", "old": "sum((-1) ** j * m[0][j]", "new": "sum((-1) ** (j + 1) * m[0][j]", "category": "off_by_one"}]},
+    {"id": "matrix-syntax", "program": "matrix", "bugs": [
+      {"file": "src/matrix.py", "old": "return [r[:col] + r[col + 1:] for i, r in enumerate(m) if i != row]", "new": "return [r[:col] + r[col + 1: for i, r in enumerate(m) if i != row]", "category": "syntax"}]},
+
+    {"id": "dates-leap-logic", "program": "dates", "bugs": [
+      {"file": "src/dates.py", "old": "(year % 100 != 0 or year % 400 == 0)", "new": "(year % 100 != 0 and year % 400 == 0)", "category": "condition"}]},
+    {"id": "dates-day-of-year", "program": "dates", "bugs": [
+      {"file": "src/dates.py", "old": "for m in range(1, month)) + day", "new": "for m in range(1, month + 1)) + day", "category": "off_by_one"}]},
+    {"id": "dates-year-wrap", "program": "dates", "bugs": [
+      {"file": "src/dates.py", "old": "            month = 1\n", "new": "            month = 0\n", "category": "constant"}]},
+
+    {"id": "ledger-helper-pad", "program": "ledger", "bugs": [
+      {"file": "src/ledger.py", "old": "int(frac.ljust(2, \"0\") or \"0\")", "new": "int(frac.rjust(2, \"0\") or \"0\")", "category": "wrong_name"}]},
+    {"id": "ledger-format-div", "program": "ledger", "bugs": [
+      {"file": "src/ledger.py", "old": "return f\"{sign}{cents // 100}.{cents % 100:02d}\"", "new": "return f\"{sign}{cents / 100}.{cents % 100:02d}\"", "category": "arithmetic"}]},
+    {"id": "ledger-two-bugs", "program": "ledger", "bugs": [
+      {"file": "src/ledger.py", "old": "if kind not in (\"deposit\", \"withdrawal\"):", "new": "if kind in (\"deposit\", \"withdrawal\"):", "category": "condition"},
+      {"file": "src/ledger.py", "old": "total += cents if kind == \"deposit\" else -cents", "new": "total += cents if kind == \"deposit\" else cents", "category": "arithmetic"}]},
+    {"id": "ledger-latent-plus", "program": "ledger", "latent": true, "bugs": [
+      {"file": "src/ledger.py", "old": "or line.startswith(\"#\"):", "new": "or line.startswith(\"//\"):", "category": "constant"},
+      {"file": "src/ledger.py", "old": "{cents % 100:02d}", "new": "{cents % 100}", "category": "constant"}]},
+
+    {"id": "graph-path-order", "program": "graph", "bugs": [
+      {"file": "src/graph.py", "old": "                return path[::-1]\n", "new": "                return path\n", "category": "missing_logic"}]},
+    {"id": "graph-components-sort", "program": "graph", "bugs": [
+      {"file": "src/graph.py", "old": "out.append(sorted(comp))", "new": "out.append(comp)", "category": "missing_logic"}]},
+    {"id": "graph-visited", "program": "graph", "bugs": [
+      {"file": "src/graph.py", "old": "            if nxt in prev:\n                continue\n", "new": "", "category": "missing_logic"}]}
+  ]
+}

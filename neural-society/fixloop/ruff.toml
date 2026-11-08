@@ -1,0 +1,8 @@
+line-length = 120
+extend-exclude = ["programs"]  # the buggy-program fixtures are deliberately simple
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM115", "PLW1510"]
+# E501: handled by `ruff format`; B905: zips here pair equal-length rows;
+# B008: mutate.py binds loop values as closure defaults on purpose.
+ignore = ["E501", "B905", "B008"]

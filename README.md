@@ -189,6 +189,7 @@ neural-society/
 ├── weights/               exported models + training reports
 ├── data/                  benchmark expressions (TSV)
 ├── results/bench.md       raw benchmark output
+├── fixloop/               milestone 2: fix-the-failing-test (planner + specialists)
 ├── docs/ARCHITECTURE.md   component design, message flow, trade-offs
 ├── RESULTS.md             findings and honest read
 └── HANDOVER.md            original project brief
@@ -204,9 +205,10 @@ neural-society/
 - [ ] Batched messages (a whole multiplication row per message) to amortise bus cost
 - [ ] Tiny transformer specialists (llama2.c-style), same binary export
 - [ ] A learned planner in place of the hand-written router
-- [ ] **Next milestone:** a "fix the failing test" loop, with a large model as planner
-      and fast compiler / test / lint / failure-classifier specialists writing to the
-      blackboard
+- [x] **Milestone 2 harness:** a "fix the failing test" loop with a large-model planner,
+      alone vs. with compiler / linter / test-runner / localizer / learned
+      failure-classifier specialists on a blackboard ([`fixloop/`](neural-society/fixloop/README.md))
+- [ ] Milestone 2 results: real model runs (needs an Anthropic API key)
 
 ## License
 

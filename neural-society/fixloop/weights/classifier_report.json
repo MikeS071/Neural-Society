@@ -1,0 +1,273 @@
+{
+ "n_train": 903,
+ "params": 2278,
+ "features": 64,
+ "train_acc": 0.823,
+ "lopo_acc": 0.645,
+ "lopo": {
+  "bsearch": {
+   "acc": 0.686,
+   "n": 86
+  },
+  "dates": {
+   "acc": 0.588,
+   "n": 102
+  },
+  "graph": {
+   "acc": 0.614,
+   "n": 83
+  },
+  "intervals": {
+   "acc": 0.695,
+   "n": 82
+  },
+  "inventory": {
+   "acc": 0.729,
+   "n": 70
+  },
+  "ledger": {
+   "acc": 0.615,
+   "n": 96
+  },
+  "matrix": {
+   "acc": 0.625,
+   "n": 88
+  },
+  "roman": {
+   "acc": 0.663,
+   "n": 104
+  },
+  "stats": {
+   "acc": 0.673,
+   "n": 98
+  },
+  "textutil": {
+   "acc": 0.585,
+   "n": 94
+  }
+ },
+ "task_acc": 0.419,
+ "task_top2": 0.645,
+ "task_majority_baseline": 0.032,
+ "task_mean_conf_correct": 0.742,
+ "task_mean_conf_wrong": 0.591,
+ "tasks": [
+  {
+   "task": "stats-median-even",
+   "label": "value",
+   "pred": "arithmetic",
+   "conf": 0.514,
+   "top2": true
+  },
+  {
+   "task": "stats-mode-tie",
+   "label": "wrong_name",
+   "pred": "arithmetic",
+   "conf": 0.49,
+   "top2": false
+  },
+  {
+   "task": "stats-two-bugs",
+   "label": "value",
+   "pred": "arithmetic",
+   "conf": 0.894,
+   "top2": true
+  },
+  {
+   "task": "textutil-title-first",
+   "label": "condition",
+   "pred": "condition",
+   "conf": 0.617,
+   "top2": true
+  },
+  {
+   "task": "textutil-palindrome-name",
+   "label": "wrong_name",
+   "pred": "missing_logic",
+   "conf": 0.568,
+   "top2": true
+  },
+  {
+   "task": "textutil-truncate",
+   "label": "value",
+   "pred": "condition",
+   "conf": 0.869,
+   "top2": false
+  },
+  {
+   "task": "intervals-length",
+   "label": "value",
+   "pred": "arithmetic",
+   "conf": 0.462,
+   "top2": false
+  },
+  {
+   "task": "intervals-overlap-touch",
+   "label": "condition",
+   "pred": "value",
+   "conf": 0.378,
+   "top2": true
+  },
+  {
+   "task": "intervals-contained",
+   "label": "missing_logic",
+   "pred": "value",
+   "conf": 0.501,
+   "top2": false
+  },
+  {
+   "task": "roman-table",
+   "label": "value",
+   "pred": "value",
+   "conf": 0.975,
+   "top2": true
+  },
+  {
+   "task": "roman-subtractive",
+   "label": "condition",
+   "pred": "condition",
+   "conf": 0.75,
+   "top2": true
+  },
+  {
+   "task": "roman-repeat",
+   "label": "missing_logic",
+   "pred": "arithmetic",
+   "conf": 0.956,
+   "top2": false
+  },
+  {
+   "task": "inventory-add-existing",
+   "label": "arithmetic",
+   "pred": "arithmetic",
+   "conf": 0.502,
+   "top2": true
+  },
+  {
+   "task": "inventory-total-items",
+   "label": "wrong_name",
+   "pred": "wrong_name",
+   "conf": 1.0,
+   "top2": true
+  },
+  {
+   "task": "inventory-latent-delete",
+   "label": "condition",
+   "pred": "condition",
+   "conf": 0.932,
+   "top2": true
+  },
+  {
+   "task": "bsearch-hang",
+   "label": "value",
+   "pred": "arithmetic",
+   "conf": 0.439,
+   "top2": false
+  },
+  {
+   "task": "bsearch-upper",
+   "label": "condition",
+   "pred": "condition",
+   "conf": 0.992,
+   "top2": true
+  },
+  {
+   "task": "bsearch-count",
+   "label": "value",
+   "pred": "value",
+   "conf": 0.51,
+   "top2": true
+  },
+  {
+   "task": "matrix-transpose-index",
+   "label": "wrong_name",
+   "pred": "value",
+   "conf": 0.762,
+   "top2": true
+  },
+  {
+   "task": "matrix-det-sign",
+   "label": "value",
+   "pred": "arithmetic",
+   "conf": 0.996,
+   "top2": false
+  },
+  {
+   "task": "matrix-syntax",
+   "label": "syntax",
+   "pred": "syntax",
+   "conf": 1.0,
+   "top2": true
+  },
+  {
+   "task": "dates-leap-logic",
+   "label": "condition",
+   "pred": "condition",
+   "conf": 0.49,
+   "top2": true
+  },
+  {
+   "task": "dates-day-of-year",
+   "label": "value",
+   "pred": "arithmetic",
+   "conf": 0.541,
+   "top2": true
+  },
+  {
+   "task": "dates-year-wrap",
+   "label": "value",
+   "pred": "missing_logic",
+   "conf": 0.344,
+   "top2": false
+  },
+  {
+   "task": "ledger-helper-pad",
+   "label": "wrong_name",
+   "pred": "arithmetic",
+   "conf": 0.585,
+   "top2": false
+  },
+  {
+   "task": "ledger-format-div",
+   "label": "arithmetic",
+   "pred": "arithmetic",
+   "conf": 0.504,
+   "top2": true
+  },
+  {
+   "task": "ledger-two-bugs",
+   "label": "condition",
+   "pred": "condition",
+   "conf": 0.999,
+   "top2": true
+  },
+  {
+   "task": "ledger-latent-plus",
+   "label": "value",
+   "pred": "value",
+   "conf": 0.372,
+   "top2": true
+  },
+  {
+   "task": "graph-path-order",
+   "label": "missing_logic",
+   "pred": "value",
+   "conf": 0.446,
+   "top2": false
+  },
+  {
+   "task": "graph-components-sort",
+   "label": "missing_logic",
+   "pred": "value",
+   "conf": 0.446,
+   "top2": false
+  },
+  {
+   "task": "graph-visited",
+   "label": "missing_logic",
+   "pred": "arithmetic",
+   "conf": 0.439,
+   "top2": true
+  }
+ ]
+}

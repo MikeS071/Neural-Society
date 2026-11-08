@@ -52,3 +52,21 @@ jobs:
           print(r)
           PY
       - run: python gen_tests.py 2
+
+  fixloop:
+    name: Fix-the-failing-test harness (offline)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: neural-society/fixloop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check . && ruff format --check .
+      - name: Every reference passes; every injected bug breaks the visible suite
+        run: python validate_tasks.py
+      - name: Harness tests (oracle planner, specialists, edit safety)
+        run: python -m unittest discover -s tests -v
