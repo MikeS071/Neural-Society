@@ -1,0 +1,17 @@
+[package]
+name = "neural_society"
+version = "0.1.0"
+edition = "2021"
+description = "Runtime for a society of tiny specialist models coordinated by a blackboard and message bus"
+
+[dependencies]
+
+[[bin]]
+name = "ns"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = false
