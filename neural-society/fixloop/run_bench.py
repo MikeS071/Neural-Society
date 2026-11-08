@@ -98,6 +98,13 @@ def main():
         default="http://localhost:11434/v1",
         help="for --planner local: OpenAI-compatible endpoint (Ollama default; llama-server: http://localhost:8080/v1)",
     )
+    ap.add_argument(
+        "--think",
+        choices=["default", "on", "off"],
+        default="default",
+        help="for --planner local: reasoning mode of hybrid thinking models (Qwen3.5, Gemma 4, LFM3, ...)",
+    )
+    ap.add_argument("--max-tokens", type=int, default=None, help="for --planner local: per-reply limit")
     ap.add_argument("--out", default=os.path.join(HERE, "results"))
     args = ap.parse_args()
     arms = args.arms.split(",")
@@ -113,7 +120,8 @@ def main():
         if args.planner == "oracle":
             planner = oracle_planner(t)
         elif args.planner == "local":
-            planner = OpenAICompatPlanner(args.model, args.base_url)
+            think = {"default": None, "on": True, "off": False}[args.think]
+            planner = OpenAICompatPlanner(args.model, args.base_url, max_tokens=args.max_tokens, think=think)
         else:
             planner = AnthropicPlanner(args.model)
         try:
@@ -136,6 +144,8 @@ def main():
     errors = [r for r in runs if "error" in r]
     runs = [r for r in runs if "error" not in r]
     name = "oracle" if args.planner == "oracle" else args.model.replace("/", "_").replace(":", "-")
+    if args.planner == "local" and args.think != "default":
+        name += f"-think-{args.think}"
     os.makedirs(args.out, exist_ok=True)
     write_text(
         os.path.join(args.out, f"{name}.json"),

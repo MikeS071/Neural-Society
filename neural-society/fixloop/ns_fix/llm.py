@@ -97,10 +97,27 @@ class AnthropicPlanner:
 class OpenAICompatPlanner:
     """Any server speaking the OpenAI chat-completions API: Ollama, llama.cpp's llama-server,
     LM Studio, vLLM. Used for locally hosted (e.g. CPU-only) planners. No API key needed for
-    local servers; NS_LOCAL_API_KEY is sent as a bearer token if set."""
+    local servers; NS_LOCAL_API_KEY is sent as a bearer token if set.
 
-    def __init__(self, model, base_url="http://localhost:11434/v1", max_tokens=2000, temperature=0.0, timeout=1800):
+    `think`: None leaves the server's default. True/False is sent both as
+    chat_template_kwargs.enable_thinking (llama-server, vLLM, SGLang) and as `think`
+    (Ollama); servers ignore whichever they do not understand. Reasoning text is never
+    kept in the conversation history, so both arms carry the same context."""
+
+    def __init__(
+        self,
+        model,
+        base_url="http://localhost:11434/v1",
+        max_tokens=None,
+        temperature=0.0,
+        timeout=3600,
+        think=None,
+    ):
         self.model = model
+        self.think = think
+        if max_tokens is None:
+            max_tokens = 12000 if think else 3000  # reasoning traces need room
+
         self.base_url = base_url.rstrip("/")
         self.max_tokens = max_tokens
         self.temperature = temperature
@@ -108,14 +125,16 @@ class OpenAICompatPlanner:
         self.api_key = os.environ.get("NS_LOCAL_API_KEY")
 
     def __call__(self, system, messages):
-        body = json.dumps(
-            {
-                "model": self.model,
-                "max_tokens": self.max_tokens,
-                "temperature": self.temperature,
-                "messages": [{"role": "system", "content": system}, *messages],
-            }
-        ).encode()
+        payload = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "messages": [{"role": "system", "content": system}, *messages],
+        }
+        if self.think is not None:
+            payload["chat_template_kwargs"] = {"enable_thinking": bool(self.think)}
+            payload["think"] = bool(self.think)
+        body = json.dumps(payload).encode()
         headers = {"content-type": "application/json"}
         if self.api_key:
             headers["authorization"] = f"Bearer {self.api_key}"
@@ -125,7 +144,7 @@ class OpenAICompatPlanner:
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as r:
                     out = json.loads(r.read())
-                text = out["choices"][0]["message"].get("content") or ""
+                text = strip_thinking(out["choices"][0]["message"].get("content") or "")
                 u = out.get("usage") or {}
                 return PlannerReply(
                     text, Usage(1, u.get("prompt_tokens", 0), u.get("completion_tokens", 0), time.time() - t0)
@@ -173,6 +192,16 @@ def oracle_planner(task):
         return "Reverting.\n```json\n" + json.dumps({"edits": edits}) + "\n```"
 
     return ScriptedPlanner(reply)
+
+
+_THINK = re.compile(r"<think>.*?</think>\s*", re.S)
+
+
+def strip_thinking(text):
+    """Drop inline reasoning (<think>...</think>), including an unterminated trailing block."""
+    text = _THINK.sub("", text)
+    i = text.find("<think>")
+    return text[:i] if i != -1 else text
 
 
 _JSON_BLOCK = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.S)

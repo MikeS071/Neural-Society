@@ -131,7 +131,9 @@ class FakeOpenAIServer:
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["content-length"])))
                 seen.append(body)
-                text = oracle("", body["messages"][1:]).text
+                text = (
+                    '<think>maybe ```json\n{"edits": []}\n``` no...</think>\n' + oracle("", body["messages"][1:]).text
+                )
                 out = {
                     "choices": [{"message": {"role": "assistant", "content": text}}],
                     "usage": {"prompt_tokens": 123, "completion_tokens": 45},
@@ -160,7 +162,7 @@ class TestLoop(unittest.TestCase):
         t = TASKS["roman-repeat"]
         srv = FakeOpenAIServer(t)
         try:
-            r = solve(t, "society", OpenAICompatPlanner("local-model", srv.url))
+            r = solve(t, "society", OpenAICompatPlanner("local-model", srv.url, think=False), keep=True)
         finally:
             srv.close()
         self.assertTrue(r["success"])
@@ -168,6 +170,9 @@ class TestLoop(unittest.TestCase):
         req = srv.requests[0]
         self.assertEqual(req["model"], "local-model")
         self.assertEqual(req["messages"][0]["role"], "system")
+        self.assertEqual(req["chat_template_kwargs"], {"enable_thinking": False})
+        self.assertFalse(req["think"])
+        self.assertNotIn("<think>", r["transcript"][1]["content"])  # reasoning stripped from history
 
     def test_oracle_solves_in_one_call(self):
         for tid in ("bsearch-hang", "graph-visited", "ledger-helper-pad", "inventory-latent-delete"):

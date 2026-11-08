@@ -111,17 +111,32 @@ Each run writes `results/<model>.json`, with every run and full transcripts, and
 `--planner local` drives any OpenAI-compatible server: Ollama, llama.cpp's
 `llama-server`, LM Studio or vLLM. No API key is needed.
 
+Suggested models, checked on Hugging Face in Nov 2026 (all have Q4_K_M GGUF builds):
+
+| model | size (Q4_K_M) | license | why |
+|---|---:|---|---|
+| `unsloth/Qwen3.5-4B-GGUF` | 2.7 GB | Apache-2.0 | main pick: strong for its size, thinking can be switched off cleanly |
+| `ornith-ai/Ornith-1.5-9B-GGUF` | 5.8 GB | MIT | strongest vendor-reported coding scores under 10B (Qwen3.5-9B base); reasoning model, so slow on CPU |
+| `LiquidAI/LFM3-1.7B-GGUF` | 1.1 GB | LFM 1.0 | the "how small can it go" point; very strong instruction following |
+
 ```bash
-# Ollama. Raise the context window first: multi-turn runs reach ~10-15K tokens, and
-# Ollama silently truncates prompts beyond its default context length.
+# Ollama pulls GGUFs straight from Hugging Face. Raise the context window first:
+# multi-turn runs reach ~10-15K tokens, and Ollama silently truncates beyond its default.
 OLLAMA_CONTEXT_LENGTH=16384 ollama serve        # in another terminal
-ollama pull qwen2.5-coder:7b
-python3 run_bench.py --planner local --model qwen2.5-coder:7b --workers 1
+ollama pull hf.co/unsloth/Qwen3.5-4B-GGUF:Q4_K_M
+python3 run_bench.py --planner local --model hf.co/unsloth/Qwen3.5-4B-GGUF:Q4_K_M --think off --workers 1
+python3 run_bench.py --planner local --model hf.co/unsloth/Qwen3.5-4B-GGUF:Q4_K_M --think on  --workers 1
 
 # llama.cpp
-llama-server -m qwen2.5-coder-7b-instruct-q4_k_m.gguf -c 16384 --port 8080
-python3 run_bench.py --planner local --model local --base-url http://localhost:8080/v1 --workers 1
+llama-server -hf unsloth/Qwen3.5-4B-GGUF:Q4_K_M -c 16384 --jinja --port 8080
+python3 run_bench.py --planner local --model local --base-url http://localhost:8080/v1 --think off --workers 1
 ```
+
+`--think on|off` controls hybrid reasoning models. Thinking makes every call several
+times slower on CPU. It is also an alternative way to spend compute, so
+**thinking-on solo vs thinking-off society** is a comparison worth having: does a
+specialist round replace thinking time? Results files are named per model and
+thinking mode.
 
 On CPU, use `--workers 1`, because generation is compute-bound and parallel requests
 only queue. Allow on the order of 1–3 minutes per planner call for a 4-bit 7B model on
