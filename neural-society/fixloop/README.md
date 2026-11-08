@@ -111,6 +111,11 @@ Each run writes `results/<model>.json`, with every run and full transcripts, and
 `--planner local` drives any OpenAI-compatible server: Ollama, llama.cpp's
 `llama-server`, LM Studio or vLLM. No API key is needed.
 
+**One command on your own Linux/macOS machine:** `bash run_local.sh` (smoke test), then
+`bash run_local.sh full` or `bash run_local.sh all` (adds a thinking-on pass). It starts a
+private Ollama server with a 16K context window, pulls the model, checks the harness and
+runs the benchmark. The only prerequisites are Python 3.10+ and [Ollama](https://ollama.com/download).
+
 Suggested models, checked on Hugging Face in Nov 2026 (all have Q4_K_M GGUF builds):
 
 | model | size (Q4_K_M) | license | why |

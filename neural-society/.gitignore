@@ -3,3 +3,4 @@ __pycache__/
 # 12.6 MB; regenerate with `cd train && python3 baseline.py`
 weights/baseline_100x.bin
 fixloop/results/oracle.*
+fixloop/results/ollama-serve.log
