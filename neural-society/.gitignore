@@ -1,0 +1,4 @@
+runtime/target/
+__pycache__/
+# 12.6 MB; regenerate with `cd train && python3 baseline.py`
+weights/baseline_100x.bin

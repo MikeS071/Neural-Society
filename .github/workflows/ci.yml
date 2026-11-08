@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  runtime:
+    name: Rust runtime
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: neural-society/runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: neural-society/runtime
+      - run: cargo fmt --check
+      - run: cargo clippy --release --all-targets -- -D warnings
+      - run: cargo test --release
+      - name: Exhaustively verify the committed specialists
+        run: cargo run --release -- verify
+      - name: Smoke test
+        run: |
+          out=$(cargo run --release -q -- eval "123456789*987654321-5")
+          test "$out" = "121932631112635264"
+
+  training:
+    name: Python training (smoke)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: neural-society/train
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy
+      - name: Retrain specialists and check they are exhaustively correct
+        run: |
+          python specialists.py
+          python - <<'PY'
+          import json
+          r = {x["name"]: x["exhaustive_acc"] for x in json.load(open("../weights/specialists_report.json"))}
+          assert all(r[k] == 1.0 for k in ("add", "sub", "mul", "cmp")), r
+          assert 0.95 <= r["mul_weak"] <= 0.99, r
+          print(r)
+          PY
+      - run: python gen_tests.py 2
