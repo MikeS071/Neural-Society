@@ -4,10 +4,10 @@ Does a large model fix bugs better, faster or more cheaply when fast specialists
 structured findings through a blackboard, compared with the same model working from
 raw tool output?
 
-**Status:** the harness, task suite, specialists and both arms are built and tested
-offline. No real model runs have been done yet. They need either an
-`ANTHROPIC_API_KEY` or a locally hosted model (see [Running](#running)). Nothing in this folder reports model results until those runs
-exist.
+**Status:** the harness, task suite, specialists and both arms are built and tested.
+The first real runs, with a local Qwen3.5-4B planner on CPU, are written up in
+[`RESULTS.md`](RESULTS.md). Claude-model runs still need an `ANTHROPIC_API_KEY` (see
+[Running](#running)).
 
 ## The experiment
 

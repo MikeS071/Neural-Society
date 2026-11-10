@@ -208,7 +208,11 @@ neural-society/
 - [x] **Milestone 2 harness:** a "fix the failing test" loop with a large-model planner,
       alone vs. with compiler / linter / test-runner / localizer / learned
       failure-classifier specialists on a blackboard ([`fixloop/`](neural-society/fixloop/README.md))
-- [ ] Milestone 2 results: real model runs (needs an Anthropic API key)
+- [x] **Milestone 2 results, local 4B planner** (Qwen3.5-4B, CPU, thinking off and on):
+      the society arm is cheaper when both arms succeed but solves fewer tasks
+      (24/31 vs 28/31 thinking off). See [`fixloop/RESULTS.md`](neural-society/fixloop/RESULTS.md)
+- [ ] Milestone 2 follow-ups: society + test-files ablation, `--repeats 3`, 1.7B / 9B
+      local models, and Claude models (needs an Anthropic API key)
 
 ## License
 
