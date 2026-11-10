@@ -67,8 +67,12 @@ def _render_blackboard(bb, prev_failing):
         else:
             lines.append(f"- tests: {len(d['failing'])} of {d['total']} failing")
         now = {t["test"] for t in d["failing"]}
-        if prev_failing is not None:
-            fixed, broke = prev_failing - now, now - prev_failing
+        if prev_failing is not None and not d["timeout"]:
+            # Compare against what actually passed / failed last round. A test absent last
+            # round (import error, hang) neither "regressed" nor became "newly passing".
+            prev_fail, prev_pass = prev_failing
+            fixed = prev_fail & set(d.get("passing", []))
+            broke = prev_pass & now
             if fixed:
                 lines.append(f"    newly passing: {', '.join(sorted(fixed))}")
             if broke:
@@ -115,7 +119,10 @@ def solve(task, arm, planner, max_iters=5, pool=None, keep=False):
         tool_ms += run_specialists(specialists, ws, bb, pool)
         tests = bb.latest("tests")
         text = _clip(_render_blackboard(bb, prev_failing))
-        prev_failing = {x["test"] for x in tests.data["failing"]}
+        prev_failing = (
+            {x["test"] for x in tests.data["failing"]},
+            set(tests.data.get("passing", [])),
+        )
         return tests.ok, text
 
     t_start = time.perf_counter()

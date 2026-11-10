@@ -140,6 +140,7 @@ class TestRunner(Specialist):
             "total": len(tests),
             "failing": failing,
             "passed": sum(t["status"] == "pass" for t in tests),
+            "passing": sorted(t["test"].split(".")[-1] for t in tests if t["status"] == "pass"),
             "timeout": bool(r.get("timeout")),
             "hang": hang,
         }
@@ -178,9 +179,12 @@ class Localizer(Specialist):
     def run(self, ws, bb):
         tests, comp = bb.latest("tests"), bb.latest("compiler")
         votes = {}
+        anchor = {}  # (file, func) -> first line that voted for it; used when func has no span
 
-        def vote(file, func, w=1.0):
+        def vote(file, func, w=1.0, line=None):
             votes[(file, func)] = votes.get((file, func), 0.0) + w
+            if line:
+                anchor.setdefault((file, func), line)
 
         files = ws.files("src")
         spans = {rel: _functions(text) for rel, text in files.items()}
@@ -193,17 +197,17 @@ class Localizer(Specialist):
             return best
 
         for e in comp.data["errors"] if comp else []:
-            vote(e["file"], func_at(e["file"], e["line"] or 0) or "<module>", 3.0)
+            vote(e["file"], func_at(e["file"], e["line"] or 0) or "<module>", 3.0, e["line"])
         if tests:
             if tests.data["hang"]:
                 for depth, f in enumerate(x for x in tests.data["hang"]["frames"] if x["file"].startswith("src/")):
-                    vote(f["file"], func_at(f["file"], f["line"]) or f["func"], 2.0 / (depth + 1))
+                    vote(f["file"], func_at(f["file"], f["line"]) or f["func"], 2.0 / (depth + 1), f["line"])
             for t in tests.data["failing"]:
                 if t["src_frames"]:
                     f = t["src_frames"][-1]
-                    vote(f["file"], func_at(f["file"], f["line"]) or f["func"], 1.0)
+                    vote(f["file"], func_at(f["file"], f["line"]) or f["func"], 1.0, f["line"])
                     for f in t["src_frames"][:-1]:
-                        vote(f["file"], func_at(f["file"], f["line"]) or f["func"], 0.25)
+                        vote(f["file"], func_at(f["file"], f["line"]) or f["func"], 0.25, f["line"])
                 elif t["test_line"]:
                     called = set(re.findall(r"([A-Za-z_]\w*)\s*\(", t["test_line"].get("code", "")))
                     called |= set(re.findall(r"\.([A-Za-z_]\w*)\s*\(", t["test_line"].get("code", "")))
@@ -217,7 +221,11 @@ class Localizer(Specialist):
         suspects = []
         for (rel, func), w in ranked:
             lines = files.get(rel, "").splitlines()
-            a, b = spans.get(rel, {}).get(func, (1, min(len(lines), 15)))
+            if func in spans.get(rel, {}):
+                a, b = spans[rel][func]
+            else:  # unparsable file or module-level code: show a window around the reported line
+                at = anchor.get((rel, func), 1)
+                a, b = max(1, at - 6), min(len(lines), at + 6)
             snippet = "\n".join(f"{i:4d} | {lines[i - 1]}" for i in range(a, min(b, len(lines)) + 1))
             suspects.append(
                 {"file": rel, "func": func, "lines": [a, b], "share": round(w / total, 2), "source": snippet}

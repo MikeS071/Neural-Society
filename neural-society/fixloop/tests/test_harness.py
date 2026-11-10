@@ -108,6 +108,15 @@ class TestSpecialists(unittest.TestCase):
         funcs = [s["func"] for s in bb.latest("localizer").data["suspects"]]
         self.assertIn("to_roman", funcs)
 
+    def test_syntax_error_localizer_shows_error_line(self):
+        # Unparsable file: the snippet must surround the compiler's line, not lines 1-15.
+        bb = self.observe("matrix-syntax")
+        line = bb.latest("compiler").data["errors"][0]["line"]
+        top = bb.latest("localizer").data["suspects"][0]
+        self.assertLessEqual(top["lines"][0], line)
+        self.assertGreaterEqual(top["lines"][1], line)
+        self.assertIn(f"{line:4d} | ", top["source"])
+
     def test_classifier(self):
         bb = self.observe("matrix-syntax")
         c = bb.latest("classifier")
@@ -244,6 +253,25 @@ class TestLoop(unittest.TestCase):
         self.assertFalse(r["success"])
         self.assertEqual(r["iterations"], 3)
         self.assertEqual(r["parse_failures"], 3)
+
+    def test_progress_ignores_tests_that_did_not_run(self):
+        # Replays the first move of the live matrix-syntax run: the import error is fixed but
+        # minor() is still wrong, so test_determinant fails. It never ran in round 1 (the module
+        # did not import), so it must not be reported as a regression.
+        edit = {
+            "file": "src/matrix.py",
+            "old": "    return [r[:col] + r[col + 1: for i, r in enumerate(m) if i != row]",
+            "new": "    return [[r[:col] + r[col+1:] for i, r in enumerate(m) if i != row]]",
+        }
+        reply = "```json\n" + json.dumps({"edits": [edit]}) + "\n```"
+        r = solve(TASKS["matrix-syntax"], "society", ScriptedPlanner([reply]), max_iters=2, keep=True)
+        round2 = r["transcript"][2]["content"]
+        self.assertIn("test_determinant", round2)
+        self.assertNotIn("REGRESSIONS", round2)
+        self.assertNotIn("newly passing", round2)
+        # The same edit again changes nothing: still no spurious progress lines.
+        round3 = r["transcript"][4]["content"]
+        self.assertNotIn("REGRESSIONS", round3)
 
     def test_fixing_only_visible_bug_fails_latent_task(self):
         t = TASKS["inventory-latent-delete"]
