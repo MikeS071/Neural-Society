@@ -14,13 +14,16 @@ Main result file: [`results/hf.co_unsloth_Qwen3.5-4B-GGUF-Q4_K_M-think-off.md`](
 
 ## Summary
 
+Unless a row says otherwise, numbers are for thinking off.
+
 | question | answer for this model |
 |---|---|
-| Does the society solve more tasks? | **No. It solves fewer:** 24/31 vs 28/31 for solo. Society alone solved 1 task and solo alone solved 5. |
+| Does the society solve more tasks? | **No. It solves fewer:** 24/31 vs 28/31 for solo. Society alone solved 1 task and solo alone solved 5. With thinking on the gap almost closes (26 vs 27). |
 | Is it cheaper when it works? | **Yes, modestly.** On the 23 tasks both arms solved, society used 32% fewer tokens (1,802 vs 2,653), fewer calls (1.09 vs 1.26) and 12% less LLM time (12.5 vs 14.2 s). |
 | Which specialists visibly helped? | The **hang stack** (`graph-visited`, which only society solved) and, after a harness fix, the **compiler + localizer** on `matrix-syntax`. |
 | What hurt? | Three things. Twice, society made an extra edit that contradicts the docstring, kept it once the visible tests passed, and failed the hidden tests. Twice, its replies ran to the token cap without an edit. Once, the localizer pointed at the validator that raised rather than the buggy caller. |
-| Did the weak classifier mislead? | No visible harm. Its top-1 hint was right on 13/31 tasks, but no transcript shows the planner following a wrong hint. |
+| Did the weak classifier mislead? | No visible harm. Its top-1 hint was right on 13/31 tasks, but no planner reply ever mentions it. |
+| Can a specialist round replace reasoning time? | **Not here.** Thinking-off society (24/31, 38.5 s per run) is cheaper than thinking-on solo (27/31, 117 s) but solves fewer tasks. Plain thinking-off solo beat both (28/31, 24.6 s). Thinking helped society, not solo, and every thinking-on failure was a reasoning trace that hit the 12K-token cap. |
 
 At this scale, structuring the tool output did not make a small model better at fixing
 bugs. It made easy fixes cheaper and made a few hard ones fail. The rest of this file
@@ -200,7 +203,50 @@ property-test specialist), not a better rendering of the same failures.
 
 ## 5. Thinking on vs thinking off
 
-_Pending: the thinking-on pass is running._
+Result file: [`results/hf.co_unsloth_Qwen3.5-4B-GGUF-Q4_K_M-think-on.md`](results/hf.co_unsloth_Qwen3.5-4B-GGUF-Q4_K_M-think-on.md).
+The pass took 2 h 52 min, against 33 min with thinking off.
+
+| configuration | success | visible pass | calls / run | tokens per success | LLM s / run | s / call | total LLM time |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| solo, thinking off | **28/31** | 29 | 1.48 | **5,397** | **24.6** | 16.6 | **12.7 min** |
+| society, thinking off | 24/31 | 28 | 1.55 | 8,386 | 38.5 | 24.9 | 19.9 min |
+| solo, thinking on | 27/31 | 29 | 1.39 | 9,069 | 117.1 | 84.4 | 60.5 min |
+| society, thinking on | 26/31 | 27 | 1.77 | 16,322 | 213.1 | 120.1 | 110.1 min |
+
+**Can a specialist round replace reasoning time?** The handover's question was
+thinking-on solo vs thinking-off society. Thinking-off society is 3x cheaper in LLM time
+(38.5 vs 117 s per run) but solves 3 fewer tasks (24 vs 27). The more striking result
+is that **for this model, reasoning bought nothing for solo**. Thinking-off solo is the
+best configuration on every metric: most tasks solved, fewest tokens, lowest time.
+Neither thinking nor the specialists improved on the plain loop.
+
+**Thinking did help society**, from 24 to 26 tasks. Society lost five tasks to solo with
+thinking off. With thinking on it solved four of them (`stats-two-bugs`,
+`intervals-contained`, `inventory-total-items`, `dates-year-wrap`). The fifth,
+`ledger-helper-pad`, stayed unsolved, and solo lost it too. With reasoning, the arms end
+up close: they differ on one task only.
+
+| task | solo on | society on | note |
+|---|---|---|---|
+| graph-visited | OK 2 | -- 5 | reversed from thinking off, where only society solved it |
+| roman-repeat | -- 5 | -- 5 | solved by both arms with thinking off |
+| ledger-helper-pad | -- 5 | -- 5 | solo solved it with thinking off |
+| ledger-latent-plus | vis 1 | -- 5 | latent; neither solves it |
+| inventory-latent-delete | vis 1 | vis 1 | latent; neither solves it |
+
+**Every thinking-on failure has the same cause: the reasoning trace runs to the 12,000-
+token cap, so the visible reply is empty.** For example, `ledger-helper-pad` produced
+180–250K characters of reasoning per run and five empty replies in both arms. A reply
+that ends empty costs about 4 minutes. A run like that costs 15–20 minutes and yields
+nothing. Society ran into the cap more often (25 empty or unparseable replies against
+13), and its runs reasoned twice as much in total (1.05M against 0.53M characters). The
+richer blackboard gave the model more to think about, not less. Several runs did
+recover: after an empty reply, the next call often produced a short, correct edit
+(`stats-two-bugs` solo, `bsearch-upper` and `matrix-det-sign` society).
+
+Hidden reasoning was recorded per run (`thinking_chars`), so this pass also confirms
+that the think switch works both ways through the native planner: 0 characters with
+thinking off, 0.5–1M with it on.
 
 ## 6. Determinism
 
@@ -243,4 +289,7 @@ outcomes look more stable, but this is two repeats, not a measurement of varianc
 4. **Runaway-reply guard** for both arms: when a reply has no edit, say so and ask for
    the JSON only; or lower the per-reply cap. This harness change would apply to both
    arms and would need a full rerun.
+   With thinking on, the same problem shows up as an empty reply after a reasoning trace
+   that hits the cap. A thinking budget, or one retry with thinking off after an empty
+   reply, would likely recover most of the thinking-on failures.
 5. `--repeats 3`, and the 1.7B and 9B models.
