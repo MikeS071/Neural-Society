@@ -6,6 +6,7 @@
 #   smoke  2 tasks, thinking off: checks everything works and shows time per call (default)
 #   full   all 31 tasks x 2 arms, thinking off
 #   all    full with thinking off, then again with thinking on
+#   on     full with thinking on only
 #   model  any Ollama model name; default hf.co/unsloth/Qwen3.5-4B-GGUF:Q4_K_M
 #
 # It starts a private Ollama server on 127.0.0.1:11435 with a 16K context window (the
@@ -71,7 +72,10 @@ case "$MODE" in
         bench off
         echo "==> full run, thinking on (much slower)"
         bench on ;;
-    *) die "unknown mode '$MODE' (smoke|full|all)" ;;
+    on)
+        echo "==> full run, thinking on (much slower)"
+        bench on ;;
+    *) die "unknown mode '$MODE' (smoke|full|all|on)" ;;
 esac
 
 echo "==> done. Summary tables: $HERE/results/*.md"
