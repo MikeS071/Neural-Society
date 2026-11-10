@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ns_fix.agents import solve  # noqa: E402
 from ns_fix.blackboard import Blackboard  # noqa: E402
-from ns_fix.llm import OpenAICompatPlanner, ScriptedPlanner, oracle_planner, parse_edits  # noqa: E402
+from ns_fix.llm import OllamaPlanner, OpenAICompatPlanner, ScriptedPlanner, oracle_planner, parse_edits  # noqa: E402
 from ns_fix.mutate import CLASSES  # noqa: E402
 from ns_fix.specialists import (  # noqa: E402
     N_FEATURES,
@@ -157,7 +157,65 @@ class FakeOpenAIServer:
         self.server.server_close()
 
 
+class FakeOllamaServer:
+    """Minimal Ollama /api/chat: thinks (separate `thinking` field) unless told think=false."""
+
+    def __init__(self, task):
+        import http.server
+        import threading
+
+        oracle = oracle_planner(task)
+        seen = self.requests = []
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["content-length"])))
+                seen.append(body)
+                out = {"message": {"role": "assistant", "content": ""}, "load_duration": 2_000_000_000}
+                if body["messages"]:
+                    out["message"]["content"] = oracle("", body["messages"][1:]).text
+                    if body.get("think", True):
+                        out["message"]["thinking"] = "let me think " * 50
+                    out.update(prompt_eval_count=200, eval_count=30)
+                data = json.dumps(out).encode()
+                self.send_response(200)
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *a):
+                pass
+
+        self.server = http.server.HTTPServer(("127.0.0.1", 0), H)
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
 class TestLoop(unittest.TestCase):
+    def test_ollama_native_planner(self):
+        t = TASKS["roman-repeat"]
+        srv = FakeOllamaServer(t)
+        try:
+            off = OllamaPlanner("m", srv.url + "/v1", think=False)  # a trailing /v1 is tolerated
+            off.warmup()
+            r_off = solve(t, "solo", off)
+            r_on = solve(t, "solo", OllamaPlanner("m", srv.url, think=True))
+        finally:
+            srv.close()
+        warm, req = srv.requests[0], srv.requests[1]
+        self.assertEqual(warm["messages"], [])
+        self.assertIs(req["think"], False)
+        self.assertEqual(req["options"]["num_ctx"], 16384)
+        self.assertFalse(req["stream"])
+        self.assertTrue(r_off["success"])
+        self.assertEqual((r_off["input_tokens"], r_off["output_tokens"], r_off["thinking_chars"]), (200, 30, 0))
+        self.assertEqual(r_off["load_s"], 2.0)
+        self.assertGreater(r_on["thinking_chars"], 0)
+
     def test_local_openai_compatible_planner(self):
         t = TASKS["roman-repeat"]
         srv = FakeOpenAIServer(t)

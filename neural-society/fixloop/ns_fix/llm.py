@@ -20,12 +20,16 @@ class Usage:
     input_tokens: int = 0
     output_tokens: int = 0
     seconds: float = 0.0
+    thinking_chars: int = 0  # reasoning text the server returned separately (not shown to either arm)
+    load_s: float = 0.0  # time the server spent loading the model inside these calls
 
     def add(self, other):
         self.calls += other.calls
         self.input_tokens += other.input_tokens
         self.output_tokens += other.output_tokens
         self.seconds += other.seconds
+        self.thinking_chars += other.thinking_chars
+        self.load_s += other.load_s
 
 
 @dataclass
@@ -154,6 +158,86 @@ class OpenAICompatPlanner:
                     time.sleep(5)
                     continue
                 raise RuntimeError(f"local model server error {e.code}: {e.read()[:500]!r}") from None
+
+
+class OllamaPlanner:
+    """Ollama's native /api/chat. Preferred over its OpenAI-compatible endpoint because it
+    honours `think` (reasoning on/off) and per-request `num_ctx`, and reports load and
+    generation timings. `base_url` is the server root, e.g. http://127.0.0.1:11434."""
+
+    def __init__(
+        self,
+        model,
+        base_url="http://127.0.0.1:11434",
+        max_tokens=None,
+        temperature=0.0,
+        num_ctx=16384,
+        timeout=3600,
+        think=None,
+    ):
+        self.model = model
+        self.base_url = base_url.rstrip("/").removesuffix("/v1")
+        self.think = think
+        self.max_tokens = max_tokens or (12000 if think else 3000)
+        self.temperature = temperature
+        self.num_ctx = num_ctx
+        self.timeout = timeout
+
+    def _post(self, payload):
+        req = urllib.request.Request(
+            f"{self.base_url}/api/chat",
+            data=json.dumps(payload).encode(),
+            method="POST",
+            headers={"content-type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            return json.loads(r.read())
+
+    def warmup(self):
+        """Load the model into memory so the first timed call does not pay for it."""
+        self._post(
+            {
+                "model": self.model,
+                "messages": [],
+                "stream": False,
+                "keep_alive": "30m",
+                "options": {"num_ctx": self.num_ctx},
+            }
+        )
+
+    def __call__(self, system, messages):
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "system", "content": system}, *messages],
+            "stream": False,
+            "keep_alive": "30m",
+            "options": {"temperature": self.temperature, "num_ctx": self.num_ctx, "num_predict": self.max_tokens},
+        }
+        if self.think is not None:
+            payload["think"] = bool(self.think)
+        t0 = time.time()
+        try:
+            out = self._post(payload)
+        except urllib.error.HTTPError as e:
+            body = e.read()[:500]
+            if e.code == 400 and b"think" in body and "think" in payload:  # model has no thinking switch
+                payload.pop("think")
+                out = self._post(payload)
+            else:
+                raise RuntimeError(f"ollama error {e.code}: {body!r}") from None
+        msg = out.get("message") or {}
+        text = strip_thinking(msg.get("content") or "")
+        return PlannerReply(
+            text,
+            Usage(
+                1,
+                out.get("prompt_eval_count", 0),
+                out.get("eval_count", 0),
+                time.time() - t0,
+                thinking_chars=len(msg.get("thinking") or ""),
+                load_s=out.get("load_duration", 0) / 1e9,
+            ),
+        )
 
 
 class ScriptedPlanner:

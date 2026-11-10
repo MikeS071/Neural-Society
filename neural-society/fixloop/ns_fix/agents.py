@@ -161,6 +161,8 @@ def solve(task, arm, planner, max_iters=5, pool=None, keep=False):
             "input_tokens": usage.input_tokens,
             "output_tokens": usage.output_tokens,
             "llm_s": round(usage.seconds, 2),
+            "thinking_chars": usage.thinking_chars,
+            "load_s": round(usage.load_s, 2),
             "tool_ms": round(tool_ms, 1),
             "wall_s": round(time.perf_counter() - t_start, 2),
             "parse_failures": parse_failures,

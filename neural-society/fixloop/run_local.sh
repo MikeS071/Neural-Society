@@ -55,7 +55,7 @@ rm -f results/oracle.json results/oracle.md
 
 bench() {  # $1 = think mode, remaining args passed through
     local think="$1"; shift
-    python3 run_bench.py --planner local --model "$MODEL" --base-url "http://${OLLAMA_HOST}/v1" \
+    python3 run_bench.py --planner ollama --model "$MODEL" --base-url "http://${OLLAMA_HOST}" \
         --think "$think" --workers 1 "$@"
 }
 

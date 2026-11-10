@@ -2,9 +2,11 @@
 
 Usage:
   python3 run_bench.py --model claude-sonnet-5-5 [--arms solo,society] [--repeats 1]
-                       [--max-iters 5] [--tasks id1,id2] [--workers 4] [--planner anthropic|local|oracle]
+                       [--max-iters 5] [--tasks id1,id2] [--workers 4] [--planner anthropic|ollama|local|oracle]
 
   --planner anthropic  (default) Claude via the Messages API; needs ANTHROPIC_API_KEY.
+  --planner ollama     Ollama's native API (honours --think and sets num_ctx itself), e.g.
+                       --planner ollama --model hf.co/unsloth/Qwen3.5-4B-GGUF:Q4_K_M --think off --workers 1
   --planner local      any OpenAI-compatible server (Ollama, llama-server, LM Studio, vLLM), e.g.
                        --planner local --model qwen2.5-coder:7b --base-url http://localhost:11434/v1 --workers 1
   --planner oracle     reverts the injected bugs; only checks the harness end to end.
@@ -20,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from ns_fix.agents import solve
 from ns_fix.blackboard import new_pool
-from ns_fix.llm import AnthropicPlanner, OpenAICompatPlanner, oracle_planner
+from ns_fix.llm import AnthropicPlanner, OllamaPlanner, OpenAICompatPlanner, oracle_planner
 from ns_fix.tasks import load_tasks, write_text
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -40,6 +42,7 @@ def summarize(runs, arms):
             "out_tok": statistics.mean(r["output_tokens"] for r in rs),
             "tok_per_success": sum(r["input_tokens"] + r["output_tokens"] for r in rs) / max(1, len(succ)),
             "llm_s": statistics.mean(r["llm_s"] for r in rs),
+            "think_chars": statistics.mean(r.get("thinking_chars", 0) for r in rs),
             "tool_s": statistics.mean(r["tool_ms"] for r in rs) / 1e3,
             "apply_fail": sum(r["apply_failures"] for r in rs),
             "parse_fail": sum(r["parse_failures"] for r in rs),
@@ -54,15 +57,15 @@ def markdown(model, runs, arms, args):
         f"# Fix-the-failing-test: `{model}`\n",
         f"{len({r['task'] for r in runs})} tasks x {args.repeats} repeat(s), max {args.max_iters} planner calls per run. "
         "Success = visible suite passes **and** hidden tests pass.\n",
-        "| arm | success | visible pass | planner calls (all / successful) | input tok | output tok | tokens per success | LLM s | tool s | bad edits | unparseable |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| arm | success | visible pass | planner calls (all / successful) | input tok | output tok | tokens per success | LLM s | tool s | hidden reasoning chars | bad edits | unparseable |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for a in arms:
         x = s[a]
         out.append(
             f"| {a} | {x['success']:.1%} | {x['visible_pass']:.1%} | {x['iters_mean']:.2f} / {x['iters_success']:.2f} | "
             f"{x['in_tok']:.0f} | {x['out_tok']:.0f} | {x['tok_per_success']:.0f} | {x['llm_s']:.1f} | "
-            f"{x['tool_s']:.2f} | {x['apply_fail']} | {x['parse_fail']} |"
+            f"{x['tool_s']:.2f} | {x['think_chars']:.0f} | {x['apply_fail']} | {x['parse_fail']} |"
         )
     out += [
         "\n## Per task (successes / runs, mean planner calls)\n",
@@ -84,6 +87,13 @@ def markdown(model, runs, arms, args):
     return "\n".join(out) + "\n"
 
 
+def make_local(args):
+    think = {"default": None, "on": True, "off": False}[args.think]
+    if args.planner == "ollama":
+        return OllamaPlanner(args.model, args.base_url, max_tokens=args.max_tokens, think=think)
+    return OpenAICompatPlanner(args.model, args.base_url, max_tokens=args.max_tokens, think=think)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="claude-sonnet-5-5")
@@ -92,7 +102,7 @@ def main():
     ap.add_argument("--max-iters", type=int, default=5)
     ap.add_argument("--tasks", default="")
     ap.add_argument("--workers", type=int, default=4)
-    ap.add_argument("--planner", default="anthropic", choices=["anthropic", "local", "oracle"])
+    ap.add_argument("--planner", default="anthropic", choices=["anthropic", "ollama", "local", "oracle"])
     ap.add_argument(
         "--base-url",
         default="http://localhost:11434/v1",
@@ -119,9 +129,8 @@ def main():
         t, a, k = job
         if args.planner == "oracle":
             planner = oracle_planner(t)
-        elif args.planner == "local":
-            think = {"default": None, "on": True, "off": False}[args.think]
-            planner = OpenAICompatPlanner(args.model, args.base_url, max_tokens=args.max_tokens, think=think)
+        elif args.planner in ("local", "ollama"):
+            planner = make_local(args)
         else:
             planner = AnthropicPlanner(args.model)
         try:
@@ -137,6 +146,14 @@ def main():
         )
         return r
 
+    if args.planner in ("local", "ollama"):
+        print(f"warming up {args.model} ...", flush=True)
+        warm = make_local(args)
+        if hasattr(warm, "warmup"):
+            warm.warmup()
+        else:
+            warm("Reply with OK.", [{"role": "user", "content": "OK?"}])
+
     t0 = time.time()
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         runs = list(pool.map(run, jobs))
@@ -144,7 +161,7 @@ def main():
     errors = [r for r in runs if "error" in r]
     runs = [r for r in runs if "error" not in r]
     name = "oracle" if args.planner == "oracle" else args.model.replace("/", "_").replace(":", "-")
-    if args.planner == "local" and args.think != "default":
+    if args.planner in ("local", "ollama") and args.think != "default":
         name += f"-think-{args.think}"
     os.makedirs(args.out, exist_ok=True)
     write_text(
